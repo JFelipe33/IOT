@@ -17,8 +17,8 @@
 ## 2. Lab Log & Stakeholder Summaries
 
 ### Lab 1: RF Characterization
-*   **To Samuel (Architect):**
-*   **To Edwin (Ops):**
+* **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
+* **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
 
 ### Lab 2: 6LoWPAN
 *   **To Samuel:**
@@ -45,11 +45,11 @@
 
 ## 3. Architecture Decision Records (ADRs)
 
-**ADR-___: [Title]**
-*   **Context:**
-*   **Decision:**
-*   **Rationale:**
-*   **Status:** [ ] Proposed | [ ] Accepted | [ ] Deprecated
+**ADR-001: Selection of 802.15.4 Radio Channel**
+* **Context:** The 2.4 GHz ISM band is shared between IEEE 802.15.4 and high-power IEEE 802.11 (WiFi) networks. Uncontrolled co-channel interference causes frame collisions, forcing MAC retransmissions and degrading battery longevity.
+* **Decision:** Operating channel set to **Channel 15** (2425 MHz).
+* **Rationale:** Empirical energy scan measured a quiet noise floor of -103 dBm on Channel 15. Geometrically, Channel 15 sits in the spectral gap between standard WiFi Channel 1 and WiFi Channel 6, isolating our low-power mesh traffic from farm router interference.
+* **Status:** [X] Accepted
 
 ---
 
@@ -59,13 +59,19 @@
 
 | Component | ISO Domain | Justification |
 |-----------|------------|---------------|
-|           |            |               |
+| ESP32-C6 SoC | SCD | Sensing/controlling device (§6.4–6.5) |
+| 802.15.4 radio + antenna | SCD | Communication subsystem |
+| Air (RF medium) | PED | Physical entity — EM propagation |
 
 ### Component Capabilities
 
 | Capability Category | Subcategory | Component/Feature | Active/Latent | Lab Introduced |
 |---------------------|-------------|-------------------|---------------|----------------|
-|                     |             |                   |               |                |
+| Transducer | Actuation | On-board LED | Active | Lab 1 |
+| Data | Processing & Storage | RSSI filtering / NVS storage / 802.15.4 TX-RX | Active | Lab 1 |
+| Interface | Network & Serial | 802.15.4 network / OpenThread CLI / Serial monitor | Active | Lab 1 |
+| Supporting | Security & Time | Time sync / Hardware crypto accelerator | Latent | Lab 1 |
+| Latent | Wireless & Debug | BLE radio / WiFi radio / USB (debug interface) | Latent | Lab 1 |
 
 ---
 
@@ -132,6 +138,13 @@
 ---
 
 ## 10. Construction Viewpoint - IoT System Pattern (Lab 8)
+
+### Lab 1: Range and Performance Baseline Data
+| Distance (m) | RSSI A→B (dBm) | RSSI B→A (dBm) | PER A→B (%) | PER B→A (%) |
+|:------------:|:--------------:|:--------------:|:-----------:|:-----------:|
+| 1 m          |                |                |             |             |
+| 10 m         |                |                |             |             |
+| 30 m         |                |                |             |             |
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
