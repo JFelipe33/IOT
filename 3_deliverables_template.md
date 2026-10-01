@@ -142,8 +142,8 @@
 ### Lab 1: Range and Performance Baseline Data
 | Distance (m) | RSSI A→B (dBm) | RSSI B→A (dBm) | PER A→B (%) | PER B→A (%) |
 |:------------:|:--------------:|:--------------:|:-----------:|:-----------:|
-| 1 m          |                |                |             |             |
-| 10 m         |                |                |             |             |
+| 1 m          |  -83              |     -83           |   0          |      0       |
+| 10 m         |   -80             |                |      0       |        0     |
 | 30 m         |                |                |             |             |
 
 | Pattern Element | Category | Your System |
