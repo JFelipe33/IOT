@@ -17,8 +17,8 @@
 ## 2. Lab Log & Stakeholder Summaries
 
 ### Lab 1: RF Characterization
-- **To Samuel (Architect):** Se realizó un escaneo de energía del espectro en los canales 11–26. Se seleccionó el Canal 15 debido a un piso de ruido óptimo (-103 dBm) ubicado en la banda de guarda entre los canales 1 y 6 de WiFi. Esto mitiga la interferencia de canal compartido y establece un presupuesto de enlace base antes del despliegue de alcance físico.
-- **To Edwin (Ops):** Se configuró la red de nodos en el Canal 15. Si ocurre pérdida de paquetes durante las operaciones en campo, verificar si se ha instalado un nuevo router WiFi local en el Canal 1 o Canal 6 de WiFi.
+- **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
+- **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
 
 ### Lab 2: 6LoWPAN
 *   **To Samuel:**
@@ -79,13 +79,13 @@
 
 **Lab 1:**
 1. **Why does RSSI drop with distance?**  
-   Al alejarse de la antena emisor, la señal de radio se dispersa en un área cada vez más grande. Por eso, la antena receptora atrapa menos energía a mayor distancia.
+   As you move away from the transmitting antenna, the radio signal spreads over an increasingly larger area. Therefore, the receiving antenna captures less energy at greater distances.
 
 2. **The receiver detects signals down to -100 dBm — why did you need > -70 dBm for < 1% packet loss?**  
-   Porque para entender los datos no basta con detectar la señal; hay que superar el ruido eléctrico del ambiente y tener suficiente margen para compensar rebotes y obstáculos sin perder paquetes.
+   Because to decode the data, merely detecting the signal is not enough; it must overcome the ambient noise floor and maintain sufficient margin to compensate for reflections and obstacles without losing packets.
 
 3. *(Optional)* **How does the radio survive WiFi interference on the same band?**  
-   Usa la técnica DSSS, que traduce cada bit en un código de 32 partes. Esto le permite al receptor reconstruir el mensaje aunque haya ruido de WiFi en el camino.
+   It uses DSSS, which spreads each bit into a 32-chip code. This allows the receiver to reconstruct the message even in the presence of WiFi noise on the same band.
 
 **Lab 2:**
 1.
@@ -153,7 +153,7 @@
 | 10 m         |   -78          |    -80         |    4        |        6    |
 | 20 m         |     -94        |     -99        |     30      |        37   |
 
-> **Nota de pruebas:** Las mediciones se realizaron dentro de una casa. Se comprobó que en línea de vista sin obstáculos la señal se mantenía fuerte, pero al colocar paredes u obstáculos entre las placas, el nivel de señal (RSSI) cayó drásticamente y aumentó la pérdida de paquetes.
+> **Testing note:** Measurements were conducted indoors. It was verified that with a clear line of sight without obstacles, the signal remained strong; however, placing walls or obstacles between the boards caused a drastic drop in signal level (RSSI) and increased packet loss.
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
