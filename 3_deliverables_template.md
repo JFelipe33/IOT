@@ -17,8 +17,8 @@
 ## 2. Lab Log & Stakeholder Summaries
 
 ### Lab 1: RF Characterization
-- **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
-- **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
+- **To Samuel (Architect):** Se realizó un escaneo de energía del espectro en los canales 11–26. Se seleccionó el Canal 15 debido a un piso de ruido óptimo (-103 dBm) ubicado en la banda de guarda entre los canales 1 y 6 de WiFi. Esto mitiga la interferencia de canal compartido y establece un presupuesto de enlace base antes del despliegue de alcance físico.
+- **To Edwin (Ops):** Se configuró la red de nodos en el Canal 15. Si ocurre pérdida de paquetes durante las operaciones en campo, verificar si se ha instalado un nuevo router WiFi local en el Canal 1 o Canal 6 de WiFi.
 
 ### Lab 2: 6LoWPAN
 *   **To Samuel:**
