@@ -21,7 +21,8 @@
 - **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
 
 ### Lab 2: 6LoWPAN
-*   **To Samuel:**
+- **To Edwin (Ops):** The network healed in an average of 8.33 seconds after router failure, easily satisfying the < 2-minute requirement. If a node goes dark in the field, technicians should verify if neighboring nodes are within RF range and inspect `ot router table`.
+- **To Samuel (Architect):** Multi-hop routing adds ~14.7 ms of RTT latency per additional hop (15.85 ms for 1 hop vs 30.55 ms for 2 hops). Firmware must strictly target the Mesh-Local EID (ML-EID) instead of RLOC addresses, as ML-EIDs remain stable when topology changes occur.
 
 ### Lab 3: Thread & CoAP
 *   **To Daniela (Customer):**
@@ -51,6 +52,12 @@
 - **Rationale:** Empirical energy scan measured a quiet noise floor of -103 dBm on Channel 15. Geometrically, Channel 15 sits in the spectral gap between standard WiFi Channel 1 and WiFi Channel 6, isolating our low-power mesh traffic from farm router interference.
 - **Status:** [X] Accepted
 
+**ADR-002: Selection of Thread Mesh Topology over LoRaWAN Star Topology**
+- **Context:** Irrigation actuator control requires low-latency bidirectionality and high network availability. A star topology (LoRaWAN) creates single points of failure and high latency for multi-hop coverage.
+- **Decision:** Adopt an OpenThread 6LoWPAN mesh topology.
+- **Rationale:** Empirical testing proved that Thread achieves ~15.85 ms 1-hop and ~30.55 ms 2-hop RTT latency, suitable for real-time valve actuation. In failure testing ("Tractor Test"), the mesh automatically healed in **8.33 seconds** (well below the 120 s limit) by routing around dead nodes without downtime.
+- **Status:** [X] Accepted
+
 ---
 
 ## 4. ISO/IEC 30141 Mapping
@@ -73,6 +80,24 @@
 | Supporting | Security & Time | Time sync / Hardware crypto accelerator | Latent | Lab 1 |
 | Latent | Wireless & Debug | BLE radio / WiFi radio / USB (debug interface) | Latent | Lab 1 |
 
+### Thread Address Classification
+
+| Type | Pattern | Scope | Used for | Lab Introduced |
+| :--- | :--- | :--- | :--- | :---: |
+| Link-local | `fe80::/64` | 1 radio hop | Neighbor discovery & MLE signaling between adjacent nodes. | Lab 2 |
+| RLOC | `<prefix>:0:ff:fe00:<RLOC16>` | Entire mesh | Dynamic packet routing based on current network location. | Lab 2 |
+| ALOC | `<prefix>:0:ff:fe00:fcXX` | Entire mesh | Anycast role identification (`fc00` identifies the Leader). | Lab 2 |
+| ML-EID | `<prefix>:<random IID>` | Entire mesh | Stable application-layer device identification. | Lab 2 |
+
+### Functional Viewpoint — Thread Roles & Power Profiles
+
+| Thread Role | Functional Role | Power Profile | Impact on 3-Month Battery Target | Lab Introduced |
+| :--- | :--- | :--- | :--- | :---: |
+| Leader | Network Coordinator | Always-On (100% RX, ~30mA) | Cannot run on batteries long-term; requires main power. | Lab 2 |
+| Router | Packet Forwarder | Always-On (100% RX, ~30mA) | Cannot run on batteries long-term; requires main power or solar. | Lab 2 |
+| REED | Standby Forwarder | Always-On (100% RX, ~30mA) | Operates as leaf until promoted; continuous RX drains battery quickly. | Lab 2 |
+| End Device (FED) | Leaf Node | Always-On (100% RX, ~30mA) | Keeps radio receiver active; cannot meet 3-month battery life. | Lab 2 |
+| Sleepy End Device (SED)| Leaf Sensor Node | Duty-Cycled (~1% RX, 5µA sleep) | **Only role that meets 3-month target** by sleeping between polls. | Lab 2 |
 ---
 
 ## 5. First Principles Reflections
@@ -88,6 +113,19 @@
    It uses DSSS, which spreads each bit into a 32-chip code. This allows the receiver to reconstruct the message even in the presence of WiFi noise on the same band.
 
 **Lab 2:**
+1. **How does a 40-byte IPv6 header fit in a 127-byte frame?**  
+   6LoWPAN uses IPHC header compression. The link-local IPv6 Interface Identifier (IID) is omitted from the transmission because the receiver reconstructs it directly from the 802.15.4 MAC address. ML-EID uses context-based compression, reducing the 40-byte header down to 2–6 bytes.
+
+2. **Why did healing take seconds and not minutes?**  
+   Healing occurred in ~8 seconds because active ICMPv6 ping traffic triggered immediate MAC ACK failures when Node B went down. The sending node detected link failure instantly without waiting for the 100-second MLE advertisement timeout used on idle links.
+
+3. **Why does Part 4 need a *poor* A–C link instead of *no* link?**  
+   A poor link ($LQI=1$) allows A and C to hear each other's fallback routing advertisements while giving the path through B ($1+1=2$) a lower cost. A total MAC deny-list would simulate nodes completely out of range, preventing the mesh from switching to the direct link when B dies. In Daniela's field, nodes must be spaced so alternative neighbors remain within weak RF range.
+
+4. *(Optional)* **Why do applications use the ML-EID?**  
+   The RLOC encodes the router ID and changes whenever a node re-attaches to a different parent or router. The ML-EID is static and bound to the device identity, ensuring application traffic continues to reach the node even after network topology shifts.
+
+**Lab 3:**
 1.
 
 ...
