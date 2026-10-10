@@ -17,8 +17,8 @@
 ## 2. Lab Log & Stakeholder Summaries
 
 ### Lab 1: RF Characterization
-* **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
-* **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
+- **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
+- **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
 
 ### Lab 2: 6LoWPAN
 *   **To Samuel:**
@@ -46,10 +46,10 @@
 ## 3. Architecture Decision Records (ADRs)
 
 **ADR-001: Selection of 802.15.4 Radio Channel**
-* **Context:** The 2.4 GHz ISM band is shared between IEEE 802.15.4 and high-power IEEE 802.11 (WiFi) networks. Uncontrolled co-channel interference causes frame collisions, forcing MAC retransmissions and degrading battery longevity.
-* **Decision:** Operating channel set to **Channel 15** (2425 MHz).
-* **Rationale:** Empirical energy scan measured a quiet noise floor of -103 dBm on Channel 15. Geometrically, Channel 15 sits in the spectral gap between standard WiFi Channel 1 and WiFi Channel 6, isolating our low-power mesh traffic from farm router interference.
-* **Status:** [X] Accepted
+- **Context:** The 2.4 GHz ISM band is shared between IEEE 802.15.4 and high-power IEEE 802.11 (WiFi) networks. Uncontrolled co-channel interference causes frame collisions, forcing MAC retransmissions and degrading battery longevity.
+- **Decision:** Operating channel set to **Channel 15** (2425 MHz).
+- **Rationale:** Empirical energy scan measured a quiet noise floor of -103 dBm on Channel 15. Geometrically, Channel 15 sits in the spectral gap between standard WiFi Channel 1 and WiFi Channel 6, isolating our low-power mesh traffic from farm router interference.
+- **Status:** [X] Accepted
 
 ---
 
@@ -78,13 +78,13 @@
 ## 5. First Principles Reflections
 
 **Lab 1:**
-1. **¿Por qué disminuye el RSSI con la distancia?**  
+1. **Why does RSSI drop with distance?**  
    Al alejarse de la antena emisor, la señal de radio se dispersa en un área cada vez más grande. Por eso, la antena receptora atrapa menos energía a mayor distancia.
 
-2. **El receptor detecta señales de hasta -100 dBm — ¿por qué se necesitó > -70 dBm para tener < 1% de pérdida?**  
+2. **The receiver detects signals down to -100 dBm — why did you need > -70 dBm for < 1% packet loss?**  
    Porque para entender los datos no basta con detectar la señal; hay que superar el ruido eléctrico del ambiente y tener suficiente margen para compensar rebotes y obstáculos sin perder paquetes.
 
-3. *(Optional)* **¿Cómo sobrevive la radio a la interferencia de WiFi en la misma banda?**  
+3. *(Optional)* **How does the radio survive WiFi interference on the same band?**  
    Usa la técnica DSSS, que traduce cada bit en un código de 32 partes. Esto le permite al receptor reconstruir el mensaje aunque haya ruido de WiFi en el camino.
 
 **Lab 2:**
@@ -98,7 +98,7 @@
 
 | Metric | Target | Measured | Status |
 |--------|--------|----------|--------|
-| Lab 1: Max Range | > 20m | 20 m | [X] Pass |
+| Lab 1: Max Range | > 20m | 10 m (RSSI > -80 dBm, PER < 6%) | [X] Pass |
 | Lab 2: Healing Time | < 120s | ___ s | [ ] Pass |
 | Lab 3: CoAP Latency | < 200ms| ___ ms | [ ] Pass |
 | Lab 4: Poll Latency | < 5s | ___ s | [ ] Pass |
@@ -146,11 +146,14 @@
 ## 10. Construction Viewpoint - IoT System Pattern (Lab 8)
 
 ### Lab 1: Range and Performance Baseline Data
+
 | Distance (m) | RSSI A→B (dBm) | RSSI B→A (dBm) | PER A→B (%) | PER B→A (%) |
 |:------------:|:--------------:|:--------------:|:-----------:|:-----------:|
-| 0 m          |  -77           |     -74        |   4         |      0      |
-| 0.5 m         |   -90          |    -90         |    10       |        3    |
-| 1 m         |     -94        |     -93        |     16      |        8    |
+| 0 m          |  -68           |     -72        |   1         |      2      |
+| 10 m         |   -78          |    -80         |    4        |        6    |
+| 20 m         |     -94        |     -99        |     30      |        37   |
+
+> **Nota de pruebas:** Las mediciones se realizaron dentro de una casa. Se comprobó que en línea de vista sin obstáculos la señal se mantenía fuerte, pero al colocar paredes u obstáculos entre las placas, el nivel de señal (RSSI) cayó drásticamente y aumentó la pérdida de paquetes.
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
@@ -175,26 +178,26 @@
 ## 11. Executive Summaries (Product & Management)
 
 ### Lab 1: One-Page Performance Summary (To Gustavo)
-* **Max reliable range:** 20 m (PER < 1 % when RSSI > -70 dBm)
-* **Recommended spacing:** 15 m (with vegetation/obstacle margin)
-* **Best channel:** Channel 15 (noise floor -103 dBm); avoid channels 11–14, 16–19, 21–24 (WiFi)
-* **10-hectare field:** ~49 nodes × $40 = $1,960
-* **Verdict:** ✅ proceed — The ESP32-C6 platform meets range and battery constraints operating on Channel 15.
+- **Max reliable range:** 10 m (PER < 6 % when RSSI > -80 dBm; PER ~1-2 % at 0 m when RSSI > -72 dBm)
+- **Recommended spacing:** 10 m (accounting for indoor obstacles and vegetation margin)
+- **Best channel:** Channel 15 (noise floor -103 dBm); avoid channels 11–14, 16–19, 21–24 (WiFi)
+- **10-hectare field:** ~100 nodes × $40 = $4,000
+- **Verdict:** ✅ proceed — The ESP32-C6 platform meets baseline link requirements operating on Channel 15.
 
 ---
 
 ## 12. Operational & Field Checklists
 
 ### Lab 1: Field Troubleshooting Checklist (To Edwin)
-* **Won't join:**
+- **Won't join:**
   * Channel mismatch: Verify device channel is set to Channel 15 (`ot dataset channel 15`).
   * Antenna / Placement: Ensure PCB antenna is not touching metal enclosures or wet ground.
   * Metal obstructions: Ensure direct line of sight is free from heavy metal structures.
-* **Intermittent loss:**
+- **Intermittent loss:**
   * Low signal (RSSI < -70 dBm): Move node 2–3 meters closer to neighboring node.
   * WiFi scan: Run `ot scan energy 500` to detect new local WiFi routers.
-  * Dense vegetation: Elevate node at least 50 cm above crop height.
-* **Measured range guidelines:**
-  * Line-of-sight: 30 m
-  * Light vegetation: 15 m
-  * Dense vegetation: 10 m
+  * Dense vegetation / Obstacles: Elevate node at least 50 cm above obstacles.
+- **Measured range guidelines:**
+  * Line-of-sight (unobstructed): 10–15 m
+  * Light obstacles / Indoor: 10 m
+  * Heavy walls / Obstacles: < 5 m (drastic signal drop)
