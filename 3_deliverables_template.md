@@ -2,7 +2,7 @@
 **GreenField Technologies | IoT Systems Design**
 
 **Team Members:**
-1. ____________________
+1. Juan Felipe Pachon Restrepo
 2. ____________________
 
 ---
