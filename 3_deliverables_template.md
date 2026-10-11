@@ -137,7 +137,7 @@
 | Metric | Target | Measured | Status |
 |--------|--------|----------|--------|
 | Lab 1: Max Range | > 20m | 10 m (RSSI > -80 dBm, PER < 6%) | [X] Pass |
-| Lab 2: Healing Time | < 120s | ___ s | [ ] Pass |
+| Lab 2: Healing Time | < 120s | 8.33 s | [X] Pass |
 | Lab 3: CoAP Latency | < 200ms| ___ ms | [ ] Pass |
 | Lab 4: Poll Latency | < 5s | ___ s | [ ] Pass |
 | Lab 6: DTLS Time | < 3s | ___ s | [ ] Pass |
@@ -193,6 +193,24 @@
 
 > **Testing note:** Measurements were conducted indoors. It was verified that with a clear line of sight without obstacles, the signal remained strong; however, placing walls or obstacles between the boards caused a drastic drop in signal level (RSSI) and increased packet loss.
 
+### Lab 2: 6LoWPAN Mesh & Resilience Baseline Data
+
+#### Multi-hop Latency Baseline (Task 3.2)
+
+| Path | Hops | RTT Min (ms) | RTT Avg (ms) | RTT Max (ms) | Packet Loss (%) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **A → B** | 1 | 15.00 | **15.85** | 31.00 | 0.0% |
+| **A → C (via B)** | 2 | 30.00 | **30.55** | 37.00 | 0.0% |
+
+#### Tractor Test Convergence Baseline 
+
+| Run | Lost Pings | Healing Time (s) | Packet Loss (%) | Post-Healing Route |
+| :---: | :---: | :---: | :---: | :--- |
+| **1** | 9 | **9.0** | 4.5% | Direct A → C (LQI 1, Next Hop 63) |
+| **2** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
+| **3** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
+
+
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
 | IoT System |            |             |
@@ -213,20 +231,18 @@
 
 ---
 
-## 11. Executive Summaries (Product & Management)
+## 11. Summaries 
 
-### Lab 1: One-Page Performance Summary (To Gustavo)
+### Lab 1: 
+
+#### One-Page Performance Summary (To Gustavo)
 - **Max reliable range:** 10 m (PER < 6 % when RSSI > -80 dBm; PER ~1-2 % at 0 m when RSSI > -72 dBm)
 - **Recommended spacing:** 10 m (accounting for indoor obstacles and vegetation margin)
 - **Best channel:** Channel 15 (noise floor -103 dBm); avoid channels 11–14, 16–19, 21–24 (WiFi)
 - **10-hectare field:** ~100 nodes × $40 = $4,000
 - **Verdict:** ✅ proceed — The ESP32-C6 platform meets baseline link requirements operating on Channel 15.
 
----
-
-## 12. Operational & Field Checklists
-
-### Lab 1: Field Troubleshooting Checklist (To Edwin)
+#### Field Troubleshooting Checklist (To Edwin)
 - **Won't join:**
   * Channel mismatch: Verify device channel is set to Channel 15 (`ot dataset channel 15`).
   * Antenna / Placement: Ensure PCB antenna is not touching metal enclosures or wet ground.
@@ -239,3 +255,16 @@
   * Line-of-sight (unobstructed): 10–15 m
   * Light obstacles / Indoor: 10 m
   * Heavy walls / Obstacles: < 5 m (drastic signal drop)
+
+### Lab 2: 
+
+#### Summary for Edwin 
+1. The network healed in **8.33 seconds** on average after router failure, easily meeting the < 2-minute requirement.
+2. If a field node goes dark, field technicians should check physical distance and RF line-of-sight to neighboring nodes.
+3. Check `ot router table` and neighbor tables on adjacent nodes to verify if the link cost recomputed properly.
+
+#### Summary for Samuel 
+1. Latency cost per hop is **~14.7 ms** (15.85 ms for 1 hop vs 30.55 ms for 2 hops).
+2. Firmware must exclusively use the **Mesh-Local EID (ML-EID)** for application traffic.
+3. RLOC addresses change dynamically during topology reconvergence, whereas ML-EIDs remain static and maintain reachability.
+
