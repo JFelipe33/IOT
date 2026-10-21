@@ -18,14 +18,27 @@
 
 ### Lab 1: RF Characterization
 - **To Samuel (Architect):** Spectrum energy scan performed across channels 11–26. Selected Channel 15 due to an optimal noise floor (-103 dBm) located in the guard band between WiFi channels 1 and 6. This mitigates co-channel interference and establishes a baseline link budget before physical range deployment.
-- **To Edwin (Ops):** Configured node network to Channel 15. If packet loss occurs during field operations, check if a new local WiFi router has been installed on WiFi Channel 1 or Channel 6.
+- **To Gustavo (Product / Performance Summary):**
+  - Max reliable range: 10 m (PER < 6% when RSSI > -80 dBm; PER ~1–2% at 0 m when RSSI > -72 dBm).
+  - Recommended spacing: 10 m (accounting for indoor obstacles and vegetation margin).
+  - Best channel: Channel 15 (noise floor -103 dBm); avoid WiFi channels 11–14, 16–19, 21–24.
+  - 10-hectare field estimate: ~100 nodes × $40 = $4,000.
+  - Verdict: ✅ Proceed — ESP32-C6 platform meets baseline link requirements operating on Channel 15.
+- **To Edwin (Ops / Field Troubleshooting Checklist):**
+  - Won't join: Verify device channel is set to Channel 15 (`ot dataset channel 15`); ensure PCB antenna is not touching metal enclosures or wet ground; maintain clear direct line of sight free from heavy metal structures.
+  - Intermittent loss: If RSSI < -70 dBm, move node 2–3 meters closer to neighboring node; run `ot scan energy 500` to detect new local WiFi interference; elevate node at least 50 cm above dense vegetation.
+  - Measured range guidelines: Line-of-sight (unobstructed): 10–15 m; Light obstacles / Indoor: 10 m; Heavy walls: < 5 m (drastic signal drop).
 
-### Lab 2: 6LoWPAN
-- **To Edwin (Ops):** The network healed in an average of 8.33 seconds after router failure, easily satisfying the < 2-minute requirement. If a node goes dark in the field, technicians should verify if neighboring nodes are within RF range and inspect `ot router table`.
-- **To Samuel (Architect):** Multi-hop routing adds ~14.7 ms of RTT latency per additional hop (15.85 ms for 1 hop vs 30.55 ms for 2 hops). Firmware must strictly target the Mesh-Local EID (ML-EID) instead of RLOC addresses, as ML-EIDs remain stable when topology changes occur.
+### Lab 2: 6LoWPAN Mesh
+- **To Samuel (Architect):** Latency cost per hop is ~14.7 ms (15.85 ms for 1 hop vs 30.55 ms for 2 hops). Firmware must exclusively use the Mesh-Local EID (ML-EID) for application traffic because RLOC addresses change dynamically during topology reconvergence, whereas ML-EIDs remain static and maintain reachability.
+- **To Edwin (Ops):** The network healed in an average of 8.33 seconds after router failure, easily satisfying the < 2-minute requirement. If a field node goes dark, technicians should check physical distance and RF line-of-sight to neighboring nodes, and inspect `ot router table` and neighbor tables on adjacent nodes to verify if link costs recomputed properly.
 
 ### Lab 3: Thread & CoAP
-*   **To Daniela (Customer):**
+- **To Daniela (Customer):** Battery life is extended to ~1.56 years using 2× AA batteries by keeping the valve's radio in sleep mode between 5-second polling cycles. Soil temperature dashboard updates are pushed automatically only when values change (> 0.5 °C) via Observe, eliminating stale periodic data while saving 90.7% of transmission energy.
+- **To Edwin (Ops):**
+  1. Command Confirmation: Valve commands use `CON` requests; an immediate `2.04 Changed` response proves the valve received and executed the command.
+  2. Unreachable Handling: If a valve is offline, the gateway retransmits 4 times over ~45 seconds before failing loudly with `coap receive response error 28: ResponseTimeout`.
+  3. Expected Latency: Field technicians should expect an average control response time of ~2.5 seconds (maximum 5 seconds), matching the valve's 5-second sleep cycle.
 
 ### Lab 4: Sensors & Control
 *   **To Edwin:**
@@ -58,6 +71,17 @@
 - **Rationale:** Empirical testing proved that Thread achieves ~15.85 ms 1-hop and ~30.55 ms 2-hop RTT latency, suitable for real-time valve actuation. In failure testing ("Tractor Test"), the mesh automatically healed in **8.33 seconds** (well below the 120 s limit) by routing around dead nodes without downtime.
 - **Status:** [X] Accepted
 
+**ADR-003: Selection of CoAP + CBOR over MQTT/JSON for Mesh Application Layer**
+- **Context:** Constrained 802.15.4 mesh networks cannot afford the high packet overhead, header sizes, and TCP connection maintenance required by HTTP or MQTT.
+- **Decision:** Adopt CoAP (RFC 7252) over UDP with CBOR (RFC 8949) binary payloads and RFC 7641 Observe.
+- **Rationale:** CoAP reduces application headers to 4 bytes and total message payload to 13–19 bytes, fitting easily inside a single 127-byte 802.15.4 frame without 6LoWPAN fragmentation. MQTT was rejected for the radio mesh because it requires persistent TCP connections and periodic keepalives that force the radio receiver to stay active, destroying battery longevity. The Observe pattern reduced telemetry traffic by 90.7% (28 notifications vs 300 polls over 5 minutes) compared to 1 Hz polling.
+- **Status:** [X] Accepted
+
+**ADR-004: Selection of 5-Second Poll Period for Battery-Powered Irrigation Valves**
+- **Context:** Battery-operated field valves must turn off their receivers to save power, but must remain responsive enough for agricultural irrigation commands.
+- **Decision:** Set the Sleepy End Device (SED) polling interval (`pollperiod`) to 5000 ms (5 s).
+- **Rationale:** Empirical tests confirmed an average downlink ping RTT of 2,443.6 ms (max 4,444 ms), which is completely imperceptible for irrigation control. Polling every 5 seconds reduces the radio-on duty cycle to 0.2%, extending 2× AA battery lifespan to 1.56 years based on active RX ($74\text{ mA}$) and sleep ($35\text{ }\mu\text{A}$) current profiles.
+- **Status:** [X] Accepted
 ---
 
 ## 4. ISO/IEC 30141 Mapping
@@ -98,6 +122,31 @@
 | REED | Standby Forwarder | Always-On (100% RX, ~30mA) | Operates as leaf until promoted; continuous RX drains battery quickly. | Lab 2 |
 | End Device (FED) | Leaf Node | Always-On (100% RX, ~30mA) | Keeps radio receiver active; cannot meet 3-month battery life. | Lab 2 |
 | Sleepy End Device (SED)| Leaf Sensor Node | Duty-Cycled (~1% RX, 5µA sleep) | **Only role that meets 3-month target** by sleeping between polls. | Lab 2 |
+
+### Application & Service Domain (ASD) — API Contracts
+
+#### `/env/temp` — Air Temperature Interface
+| Parameter | Contract Specification |
+|---|---|
+| **Methods** | `GET`, `GET` + Observe (RFC 7641) |
+| **Content-Format** | `60` (`application/cbor`) |
+| **Payload** | `{"t": float16}`, °C, 6 bytes (`A1 61 74 F9 hh ll`) |
+| **Max-Age** | 60 s |
+| **Observe Policy** | `NON` push when $\Delta T > 0.5^\circ\text{C}$; `CON` heartbeat after 45 s without change |
+
+#### `/act/valve` — Irrigation Valve Interface
+| Parameter | Contract Specification |
+|---|---|
+| **Methods** | `PUT` (set state), `GET` (read state) |
+| **Request Payload** | CBOR `{"v": 0 \| 1}` (Content-Format 60) or text `"0"` / `"1"` |
+| **Response Payload**| CBOR `{"v": 0 \| 1}` (Content-Format 60) |
+| **Response Codes** | `2.04 Changed` (PUT success), `2.05 Content` (GET), `4.00 Bad Request` |
+| **Idempotency** | Yes: duplicate `PUT` requests preserve the same state |
+
+```cddl
+env-reading = { t: float16 }        ; °C
+valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
+```
 ---
 
 ## 5. First Principles Reflections
@@ -126,6 +175,19 @@
    The RLOC encodes the router ID and changes whenever a node re-attaches to a different parent or router. The ML-EID is static and bound to the device identity, ensuring application traffic continues to reach the node even after network topology shifts.
 
 **Lab 3:**
+1. **Why can CoAP use UDP where HTTP needs TCP? What does CON give back, and what does NON deliberately give up?**
+   CoAP uses UDP to avoid TCP's high connection setup and keepalive costs. CON restores reliability by requiring an ACK and auto-retransmitting on loss. NON deliberately drops ACKs to minimize radio time on routine periodic readings.
+
+2. **Why does Observe save battery compared with `GET` every 60 s? Who knows when the value changed, and who pays for the radio?**
+   GET forces the client to wake up and poll even when data hasn't changed. Observe lets the server—which alone knows when data shifts—push updates only when temperature moves $>0.5^\circ\text{C}$ or every 45 s on heartbeat, cutting traffic by over 90%.
+
+3. **Why did the SED receive the same PUT twice in Task 5.3, and why was that harmless? What would have happened with a "toggle valve" command?**
+   CoAP retransmits after 2–3 s assuming loss, but the valve sleeps for 5 s. The parent buffers both requests and delivers them together when the valve wakes. It was harmless because `PUT` sets an explicit state (`OPEN`). A non-idempotent `toggle` command would have opened and immediately closed the valve.
+
+4. **Why CBOR and not a hand-made binary struct?**
+   Custom C structs break whenever fields change or memory alignment differs across platforms. CBOR retains JSON's flexible key-value model while shrinking payloads down to 6 bytes in a standardized, schema-driven format.
+
+**Lab 4:**
 1.
 
 ...
@@ -138,10 +200,13 @@
 |--------|--------|----------|--------|
 | Lab 1: Max Range | > 20m | 10 m (RSSI > -80 dBm, PER < 6%) | [X] Pass |
 | Lab 2: Healing Time | < 120s | 8.33 s | [X] Pass |
-| Lab 3: CoAP Latency | < 200ms| ___ ms | [ ] Pass |
+| Lab 3: CoAP 1-Hop GET RTT | < 200ms | 15.85 ms | [X] Pass |
+| Lab 3: CON Max Retry Span | < 120s | 93.0 s (Error 28: ResponseTimeout) | [X] Pass |
+| Lab 3: SED Latency (1s poll)| < 2s | 544.1 ms avg (min 148 ms / max 1,061 ms) | [X] Pass |
+| Lab 3: SED Latency (5s poll)| < 6s | 2,443.6 ms avg (min 443 ms / max 4,444 ms) | [X] Pass |
+| Lab 3: SED Latency (15s poll)| < 20s | 6,850.1 ms avg (min 479 ms / max 14,479 ms) | [X] Pass |
 | Lab 4: Poll Latency | < 5s | ___ s | [ ] Pass |
 | Lab 6: DTLS Time | < 3s | ___ s | [ ] Pass |
-
 ---
 
 ## 7. Ethics & Sustainability Checklist
@@ -210,6 +275,24 @@
 | **2** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
 | **3** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
 
+### Lab 3:
+
+### Sleepy Valve Energy & Battery Life Estimate (5s Poll Period)
+
+- **ESP32-C6 Datasheet Parameters (Table 5-9 & Table 5-11):**
+  - Active 802.15.4 RX Current ($I_{rx}$): $74.0\text{ mA}$ (Table 5-9)
+  - Light Sleep Current ($I_{sleep}$): $35.0\text{ }\mu\text{A}$ (Table 5-11)
+  - Poll Active Duration ($t_{on}$): $10\text{ ms}$
+  - Poll Period ($T_{poll}$): $5000\text{ ms}$
+
+- **Duty Cycle & Average Current Calculation:**
+  $$\text{Duty Cycle } (D) = \frac{t_{on}}{T_{poll}} = \frac{10\text{ ms}}{5000\text{ ms}} = 0.002 \quad (0.2\%)$$
+
+  $$I_{avg} = (D \times I_{rx}) + ((1 - D) \times I_{sleep})$$
+  $$I_{avg} = (0.002 \times 74.0\text{ mA}) + (0.998 \times 0.035\text{ mA}) = 0.148\text{ mA} + 0.0349\text{ mA} = 0.1829\text{ mA} \quad (182.9\text{ }\mu\text{A})$$
+
+- **Battery Lifespan (Standard 2× AA Alkaline Batteries @ 2500 mAh):**
+  $$\text{Battery Life (hours)} = \frac{2500\text{ mAh}}{0.1829\text{ mA}} \approx 13,668.6\text{ hours} \approx \mathbf{1.56\text{ years}}$$
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
@@ -230,41 +313,3 @@
 | Supplemental (management) | |          |
 
 ---
-
-## 11. Summaries 
-
-### Lab 1: 
-
-#### One-Page Performance Summary (To Gustavo)
-- **Max reliable range:** 10 m (PER < 6 % when RSSI > -80 dBm; PER ~1-2 % at 0 m when RSSI > -72 dBm)
-- **Recommended spacing:** 10 m (accounting for indoor obstacles and vegetation margin)
-- **Best channel:** Channel 15 (noise floor -103 dBm); avoid channels 11–14, 16–19, 21–24 (WiFi)
-- **10-hectare field:** ~100 nodes × $40 = $4,000
-- **Verdict:** ✅ proceed — The ESP32-C6 platform meets baseline link requirements operating on Channel 15.
-
-#### Field Troubleshooting Checklist (To Edwin)
-- **Won't join:**
-  * Channel mismatch: Verify device channel is set to Channel 15 (`ot dataset channel 15`).
-  * Antenna / Placement: Ensure PCB antenna is not touching metal enclosures or wet ground.
-  * Metal obstructions: Ensure direct line of sight is free from heavy metal structures.
-- **Intermittent loss:**
-  * Low signal (RSSI < -70 dBm): Move node 2–3 meters closer to neighboring node.
-  * WiFi scan: Run `ot scan energy 500` to detect new local WiFi routers.
-  * Dense vegetation / Obstacles: Elevate node at least 50 cm above obstacles.
-- **Measured range guidelines:**
-  * Line-of-sight (unobstructed): 10–15 m
-  * Light obstacles / Indoor: 10 m
-  * Heavy walls / Obstacles: < 5 m (drastic signal drop)
-
-### Lab 2: 
-
-#### Summary for Edwin 
-1. The network healed in **8.33 seconds** on average after router failure, easily meeting the < 2-minute requirement.
-2. If a field node goes dark, field technicians should check physical distance and RF line-of-sight to neighboring nodes.
-3. Check `ot router table` and neighbor tables on adjacent nodes to verify if the link cost recomputed properly.
-
-#### Summary for Samuel 
-1. Latency cost per hop is **~14.7 ms** (15.85 ms for 1 hop vs 30.55 ms for 2 hops).
-2. Firmware must exclusively use the **Mesh-Local EID (ML-EID)** for application traffic.
-3. RLOC addresses change dynamically during topology reconvergence, whereas ML-EIDs remain static and maintain reachability.
-
