@@ -41,7 +41,8 @@
   3. Expected Latency: Field technicians should expect an average control response time of ~2.5 seconds (maximum 5 seconds), matching the valve's 5-second sleep cycle.
 
 ### Lab 4: Sensors & Control
-*   **To Edwin:**
+- **To Edwin (Ops):**
+  Field technicians tell a dead sensor from a dead node by checking the CoAP response code, as a dead sensor returns an explicit 5.03 Service Unavailable error after 60 seconds of freshness expiration. Conversely, a dead node causes complete radio silence, resulting in a 42.4-second CoAP ResponseTimeout error or missing 45-second Observe heartbeats. In short, if the node explicitly answers 5.03, inspect the sensor wiring, but if the node remains silent or times out, check node power and mesh connectivity.
 
 ### Lab 5: Border Router
 *   **To Daniela:**
@@ -131,8 +132,11 @@
 | **Methods** | `GET`, `GET` + Observe (RFC 7641) |
 | **Content-Format** | `60` (`application/cbor`) |
 | **Payload** | `{"t": float16}`, °C, 6 bytes (`A1 61 74 F9 hh ll`) |
-| **Max-Age** | 60 s |
-| **Observe Policy** | `NON` push when $\Delta T > 0.5^\circ\text{C}$; `CON` heartbeat after 45 s without change |
+| **Accuracy** | $\pm 2.0^\circ\text{C}$ (DHT11 datasheet rating) |
+| **Max-Age** | $60\text{ s} - \text{reading age}$ (counts down to 0) |
+| **Plausibility** | Rejects $T < -40^\circ\text{C}$, $T \ge 85^\circ\text{C}$, or $\Delta T > 5.0^\circ\text{C}$ in $2\text{ s}$ |
+| **Error Response** | `5.03 Service Unavailable` with `Max-Age: 10` when reading age $> 60\text{ s}$ |
+| **Observe Policy** | `NON` push when $\Delta T > 0.5^\circ\text{C}$; `CON` heartbeat after 45 s without change; single `5.03` terminates observation on expiration |
 
 #### `/act/valve` — Irrigation Valve Interface
 | Parameter | Contract Specification |
@@ -158,9 +162,6 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 2. **The receiver detects signals down to -100 dBm — why did you need > -70 dBm for < 1% packet loss?**  
    Because to decode the data, merely detecting the signal is not enough; it must overcome the ambient noise floor and maintain sufficient margin to compensate for reflections and obstacles without losing packets.
 
-3. *(Optional)* **How does the radio survive WiFi interference on the same band?**  
-   It uses DSSS, which spreads each bit into a 32-chip code. This allows the receiver to reconstruct the message even in the presence of WiFi noise on the same band.
-
 **Lab 2:**
 1. **How does a 40-byte IPv6 header fit in a 127-byte frame?**  
    6LoWPAN uses IPHC header compression. The link-local IPv6 Interface Identifier (IID) is omitted from the transmission because the receiver reconstructs it directly from the 802.15.4 MAC address. ML-EID uses context-based compression, reducing the 40-byte header down to 2–6 bytes.
@@ -170,9 +171,6 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 
 3. **Why does Part 4 need a *poor* A–C link instead of *no* link?**  
    A poor link ($LQI=1$) allows A and C to hear each other's fallback routing advertisements while giving the path through B ($1+1=2$) a lower cost. A total MAC deny-list would simulate nodes completely out of range, preventing the mesh from switching to the direct link when B dies. In Daniela's field, nodes must be spaced so alternative neighbors remain within weak RF range.
-
-4. *(Optional)* **Why do applications use the ML-EID?**  
-   The RLOC encodes the router ID and changes whenever a node re-attaches to a different parent or router. The ML-EID is static and bound to the device identity, ensuring application traffic continues to reach the node even after network topology shifts.
 
 **Lab 3:**
 1. **Why can CoAP use UDP where HTTP needs TCP? What does CON give back, and what does NON deliberately give up?**
@@ -188,8 +186,20 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
    Custom C structs break whenever fields change or memory alignment differs across platforms. CBOR retains JSON's flexible key-value model while shrinking payloads down to 6 bytes in a standardized, schema-driven format.
 
 **Lab 4:**
-1.
+1. **Why does `/env/temp` answer 5.03 instead of the last value it has?**  
+   Serving an old reading as current misleads the application, which could leave irrigation valves closed during extreme heat. Returning `5.03 Service Unavailable` explicitly warns the client that fresh data is missing rather than giving stale numbers past their Max-Age.
 
+2. **How does a client tell "sensor dead" from "node unreachable"?**  
+   A dead sensor allows the node to stay online and actively reply with a `5.03` error code after 60 seconds. An unreachable node causes complete silence, leading to a CoAP `ResponseTimeout` (42.4 seconds) or missed heartbeats.
+
+3. **Why can't a plausibility check stop a value that is wrong but believable?**  
+   Local checks only verify if a reading falls inside physical range limits and maximum step sizes. A value that is wrong but plausible (like 25.5 °C instead of 21.0 °C) satisfies all local rules, requiring external cross-validation or cryptographic proof to detect.
+
+4. **Why can a busy radio make a sensor read fail?**  
+   The DHT11 uses a single-wire protocol where the CPU manually measures microsecond timing pulses. Incoming radio interrupts pause the CPU during the reading window, distorting the measured pulse widths and causing checksum errors.
+
+
+**Lab 5:**
 ...
 
 ---
@@ -205,14 +215,15 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Lab 3: SED Latency (1s poll)| < 2s | 544.1 ms avg (min 148 ms / max 1,061 ms) | [X] Pass |
 | Lab 3: SED Latency (5s poll)| < 6s | 2,443.6 ms avg (min 443 ms / max 4,444 ms) | [X] Pass |
 | Lab 3: SED Latency (15s poll)| < 20s | 6,850.1 ms avg (min 479 ms / max 14,479 ms) | [X] Pass |
-| Lab 4: Poll Latency | < 5s | ___ s | [ ] Pass |
+| Lab 4: Lost Sensor Detection | ≤ 60 s | 60.0 s (5.03 response) | [X] Pass |
+| Lab 4: Busy Radio Failure Rate | < 5% | 19.4% (13/67 failed reads under ping flood) | [ ] Fail |
 | Lab 6: DTLS Time | < 3s | ___ s | [ ] Pass |
 ---
 
 ## 7. Ethics & Sustainability Checklist
 
 *   [X] **Lab 1:** Verified interference doesn't disrupt neighbors.
-*   [ ] **Lab 4:** Data collection minimized (Privacy).
+*   [X] **Lab 4:** Data collection minimized (Privacy).
 *   [ ] **Lab 5:** System works locally without cloud (Sustainability).
 *   [ ] **Lab 6:** Encryption enabled (Privacy).
 *   [ ] **Lab 8:** End-of-Life plan considered.
@@ -227,7 +238,7 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Business |               |                         |
 | Usage |                  |                         |
 | Functional |             |                         |
-| Trustworthiness |        |                         |
+| Trustworthiness | Lab 4 | Data freshness (Max-Age), sensor failure signatures, radio load impact, and self-healing limits. |
 | Construction |           |                         |
 
 ---
