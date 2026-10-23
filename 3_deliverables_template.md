@@ -304,18 +304,18 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 #### DHT11 Sensor Characterization
 | Metric | Datasheet Rating | Measured Value |
 |---|---|---|
-| **Resolution** | 1.0 °C | 1.0 °C[cite: 15, 16] |
-| **Noise Spread (1 min static)** | N/A | 0.0 °C[cite: 15, 16] |
-| **Accuracy** | ±2.0 °C | ±2.0 °C[cite: 15] |
-| **Read Execution Latency** | N/A | 21,811 µs avg (18,115 µs min / 22,113 µs max)[cite: 15] |
+| **Resolution** | 1.0 °C | 1.0 °C |
+| **Noise Spread (1 min static)** | N/A | 0.0 °C |
+| **Accuracy** | ±2.0 °C | ±2.0 °C |
+| **Read Execution Latency** | N/A | 21,811 µs avg (18,115 µs min / 22,113 µs max) |
 
 #### Failure Mode & Radio Impact Baseline
 | Test Condition | Measured Value | Failure Signature |
 |---|---|---|
-| **Sensor Unplugged Detection** | 60.0 s | Explicit `5.03 Service Unavailable` (`no fresh reading`)[cite: 15, 24] |
-| **Node Off Network Detection** | 42.40 s | `coap receive response error 28: ResponseTimeout`[cite: 15] |
-| **Quiet Radio Failure Rate (2 min)** | 0.0% (0 / 76 failed) | Clean timing slots[cite: 15] |
-| **Busy Radio Failure Rate (10 pings/s, 2 min)** | 19.4% (13 / 67 failed) | CPU interrupt bit-timing corruption (Checksum error)[cite: 15, 16] |
+| **Sensor Unplugged Detection** | 60.0 s | Explicit `5.03 Service Unavailable` (`no fresh reading`) |
+| **Node Off Network Detection** | 42.40 s | `coap receive response error 28: ResponseTimeout` |
+| **Quiet Radio Failure Rate (2 min)** | 0.0% (0 / 76 failed) | Clean timing slots] |
+| **Busy Radio Failure Rate (10 pings/s, 2 min)** | 19.4% (13 / 67 failed) | CPU interrupt bit-timing corruption (Checksum error) |
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
