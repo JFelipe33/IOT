@@ -223,7 +223,9 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 ## 7. Ethics & Sustainability Checklist
 
 *   [X] **Lab 1:** Verified interference doesn't disrupt neighbors.
-*   [X] **Lab 4:** Data collection minimized (Privacy).
+* [X] **Lab 3 Safety & Sustainability Design (Failsafe Mechanism):** 
+  To prevent crop damage, soil erosion, and water wastage if the network dies after receiving an `OPEN` (`v: 1`) command, the valve firmware implements a local hardware safety timer (15-minute cutoff). If no network heartbeat or explicit `CLOSE` (`v: 0`) command is received within 15 minutes, the valve autonomously shuts down (`v: 0`) on its own without requiring network connectivity.
+*   [X] **Lab 4 (Safety Design for Missing Data):** If an automated irrigation control rule receives a `5.03` error or no CoAP response for longer than 60 seconds, it must default to a safe state (`CLOSE` valve) after a 5-minute timeout to prevent crop flooding or water depletion.
 *   [ ] **Lab 5:** System works locally without cloud (Sustainability).
 *   [ ] **Lab 6:** Encryption enabled (Privacy).
 *   [ ] **Lab 8:** End-of-Life plan considered.
@@ -286,24 +288,34 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | **2** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
 | **3** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
 
-### Lab 3:
+### Lab 3: CoAP Application Layer & Energy Baselines
 
-### Sleepy Valve Energy & Battery Life Estimate (5s Poll Period)
+#### Empirical Byte Budget Comparison
+| Exchange | Request Payload | Response Payload | Total Packets | Notes |
+|---|---|---|---|---|
+| HTTP/JSON reading (Lab 0) | ~150 B + TCP | ~120 B + TCP | 7+ | Handshake, GET, 200 OK, teardown |
+| MQTT/JSON reading (Lab 0) | — | ~40 B | 1 | Persistent TCP connection |
+| CoAP GET `/env/temp` | 15 B | 17 B | 2 | 1 UDP req, 1 UDP resp |
+| CoAP Observe notification | — | 19 B | 1 | Single push NON datagram |
+| CoAP PUT `/act/valve` (CON) | 18 B | 13 B | 2 | Piggybacked ACK response |
 
-- **ESP32-C6 Datasheet Parameters (Table 5-9 & Table 5-11):**
-  - Active 802.15.4 RX Current ($I_{rx}$): $74.0\text{ mA}$ (Table 5-9)
-  - Light Sleep Current ($I_{sleep}$): $35.0\text{ }\mu\text{A}$ (Table 5-11)
-  - Poll Active Duration ($t_{on}$): $10\text{ ms}$
-  - Poll Period ($T_{poll}$): $5000\text{ ms}$
+### Lab 4: Real Sensor Characterization & Reliability Baseline Data
 
-- **Duty Cycle & Average Current Calculation:**
-  $$\text{Duty Cycle } (D) = \frac{t_{on}}{T_{poll}} = \frac{10\text{ ms}}{5000\text{ ms}} = 0.002 \quad (0.2\%)$$
+#### DHT11 Sensor Characterization
+| Metric | Datasheet Rating | Measured Value |
+|---|---|---|
+| **Resolution** | 1.0 °C | 1.0 °C[cite: 15, 16] |
+| **Noise Spread (1 min static)** | N/A | 0.0 °C[cite: 15, 16] |
+| **Accuracy** | ±2.0 °C | ±2.0 °C[cite: 15] |
+| **Read Execution Latency** | N/A | 21,811 µs avg (18,115 µs min / 22,113 µs max)[cite: 15] |
 
-  $$I_{avg} = (D \times I_{rx}) + ((1 - D) \times I_{sleep})$$
-  $$I_{avg} = (0.002 \times 74.0\text{ mA}) + (0.998 \times 0.035\text{ mA}) = 0.148\text{ mA} + 0.0349\text{ mA} = 0.1829\text{ mA} \quad (182.9\text{ }\mu\text{A})$$
-
-- **Battery Lifespan (Standard 2× AA Alkaline Batteries @ 2500 mAh):**
-  $$\text{Battery Life (hours)} = \frac{2500\text{ mAh}}{0.1829\text{ mA}} \approx 13,668.6\text{ hours} \approx \mathbf{1.56\text{ years}}$$
+#### Failure Mode & Radio Impact Baseline
+| Test Condition | Measured Value | Failure Signature |
+|---|---|---|
+| **Sensor Unplugged Detection** | 60.0 s | Explicit `5.03 Service Unavailable` (`no fresh reading`)[cite: 15, 24] |
+| **Node Off Network Detection** | 42.40 s | `coap receive response error 28: ResponseTimeout`[cite: 15] |
+| **Quiet Radio Failure Rate (2 min)** | 0.0% (0 / 76 failed) | Clean timing slots[cite: 15] |
+| **Busy Radio Failure Rate (10 pings/s, 2 min)** | 19.4% (13 / 67 failed) | CPU interrupt bit-timing corruption (Checksum error)[cite: 15, 16] |
 
 | Pattern Element | Category | Your System |
 |-----------------|----------|-------------|
