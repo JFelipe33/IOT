@@ -290,6 +290,23 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 
 ### Lab 3: CoAP Application Layer & Energy Baselines
 
+### Sleepy Valve Energy & Battery Life Estimate (5s Poll Period)
+
+- **ESP32-C6 Datasheet Parameters (Table 5-9 & Table 5-11):**
+  - Active 802.15.4 RX Current ($I_{rx}$): $74.0\text{ mA}$ (Table 5-9)
+  - Light Sleep Current ($I_{sleep}$): $35.0\text{ }\mu\text{A}$ (Table 5-11)
+  - Poll Active Duration ($t_{on}$): $10\text{ ms}$
+  - Poll Period ($T_{poll}$): $5000\text{ ms}$
+
+- **Duty Cycle & Average Current Calculation:**
+  $$\text{Duty Cycle } (D) = \frac{t_{on}}{T_{poll}} = \frac{10\text{ ms}}{5000\text{ ms}} = 0.002 \quad (0.2\%)$$
+
+  $$I_{avg} = (D \times I_{rx}) + ((1 - D) \times I_{sleep})$$
+  $$I_{avg} = (0.002 \times 74.0\text{ mA}) + (0.998 \times 0.035\text{ mA}) = 0.148\text{ mA} + 0.0349\text{ mA} = 0.1829\text{ mA} \quad (182.9\text{ }\mu\text{A})$$
+
+- **Battery Lifespan (Standard 2× AA Alkaline Batteries @ 2500 mAh):**
+  $$\text{Battery Life (hours)} = \frac{2500\text{ mAh}}{0.1829\text{ mA}} \approx 13,668.6\text{ hours} \approx \mathbf{1.56\text{ years}}$$
+
 #### Empirical Byte Budget Comparison
 | Exchange | Request Payload | Response Payload | Total Packets | Notes |
 |---|---|---|---|---|
