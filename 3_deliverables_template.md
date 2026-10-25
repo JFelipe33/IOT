@@ -36,9 +36,9 @@
 ### Lab 3: Thread & CoAP
 - **To Daniela (Customer):** Battery life is extended to ~1.56 years using 2× AA batteries by keeping the valve's radio in sleep mode between 5-second polling cycles. Soil temperature dashboard updates are pushed automatically only when values change (> 0.5 °C) via Observe, eliminating stale periodic data while saving 90.7% of transmission energy.
 - **To Edwin (Ops):**
-  1. Command Confirmation: Valve commands use `CON` requests; an immediate `2.04 Changed` response proves the valve received and executed the command.
-  2. Unreachable Handling: If a valve is offline, the gateway retransmits 4 times over ~45 seconds before failing loudly with `coap receive response error 28: ResponseTimeout`.
-  3. Expected Latency: Field technicians should expect an average control response time of ~2.5 seconds (maximum 5 seconds), matching the valve's 5-second sleep cycle.
+Valve commands use confirmable messages (CON) where an immediate 2.04 Changed response proves the action was received and executed.
+If a valve is offline, the system retransmits 4 times over 45 seconds before failing loudly with a ResponseTimeout error.
+Field technicians should expect an average control response time of 2.5 seconds (maximum 5 seconds), matching the valve's 5-second sleep cycle.
 
 ### Lab 4: Sensors & Control
 - **To Edwin (Ops):**
@@ -93,7 +93,9 @@
 |-----------|------------|---------------|
 | ESP32-C6 SoC | SCD | Sensing/controlling device (§6.4–6.5) |
 | 802.15.4 radio + antenna | SCD | Communication subsystem |
+| Physical Sensor Module (DHT11) | SCD | Hardware transducer acquiring environmental readings |
 | Air (RF medium) | PED | Physical entity — EM propagation |
+| Air / Soil Temperature & Humidity | PED | Physical entity being observed — Ambient thermal and moisture state |
 
 ### Component Capabilities
 
@@ -249,11 +251,11 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 
 | Characteristic | Addressed? | How | Gaps |
 |----------------|------------|-----|------|
-| Availability |            |     |      |
-| Confidentiality |         |     |      |
-| Integrity |               |     |      |
-| Reliability |             |     |      |
-| Resilience |              |     |      |
+| **Availability** | Yes (Lab 4) | Max-Age freshness tracking; explicit `5.03 Service Unavailable` on stale data (> 60 s); `ResponseTimeout` (42.4 s) when node is unreachable. | Server RAM reboot or 5.03 error clears observer subscriptions, requiring client re-registration. |
+| **Confidentiality** | No | → Lab 6 | Unencrypted UDP payloads accessible to eavesdroppers on the radio medium. |
+| **Integrity** | Yes (Lab 4) | Local range (-40 to 85 °C) and step-check (5 °C max jump) filters catch hardware/sensor fault spikes. | Cannot reject plausible false readings (e.g., injected 25.5 °C vs 21.0 °C) without multi-sensor fusion or authentication (→ Lab 6). |
+| **Reliability** | Yes (Lab 4) | Sensor reads sampled every 2 s with 0.0% failure rate under quiet radio conditions. | 19.4% failure rate under busy radio traffic (ping flood) exceeds < 5% target due to CPU single-wire timing interrupts. |
+| **Resilience** | Yes (Lab 4) | Auto-heals from transient read errors and wire reconnection (`Sensor back`). | Does not auto-heal active CoAP observations after 5.03 or node reboot; sensor driver missing at boot requires manual reset. |
 | Safety |                  |     |      |
 | Compliance |              |     |      |
 
