@@ -7,7 +7,7 @@
 
 ## 1. System Overview
 
-*   **System Type:** [X] Component (Lab 1-2) | [ ] System (Lab 3-6) | [ ] Environment (Lab 7-8)
+*   **System Type:** [X] Component (Lab 1-2) | [X] System (Lab 3-6) | [ ] Environment (Lab 7-8)
 *   **Description:** ESP32-C6-DevKitC-1 node operating IEEE 802.15.4 radio at 2.4 GHz (Channel 15, 0 dBm TX power) using OpenThread for empirical RF characterization.
 
 ## 2. Lab Log & Stakeholder Summaries
