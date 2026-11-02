@@ -5,14 +5,10 @@
 1. Juan Felipe Pachon Restrepo
 2. ____________________
 
----
-
 ## 1. System Overview
 
 *   **System Type:** [X] Component (Lab 1-2) | [ ] System (Lab 3-6) | [ ] Environment (Lab 7-8)
 *   **Description:** ESP32-C6-DevKitC-1 node operating IEEE 802.15.4 radio at 2.4 GHz (Channel 15, 0 dBm TX power) using OpenThread for empirical RF characterization.
-
----
 
 ## 2. Lab Log & Stakeholder Summaries
 
@@ -57,8 +53,6 @@ Field technicians should expect an average control response time of 2.5 seconds 
 ### Lab 8: Final Integration
 *   **To All:**
 
----
-
 ## 3. Architecture Decision Records (ADRs)
 
 **ADR-001: Selection of 802.15.4 Radio Channel**
@@ -90,7 +84,6 @@ Field technicians should expect an average control response time of 2.5 seconds 
 - **Decision:** Deploy a single dual-chip OTBR (ESP32-S3 host + ESP32-C6 RCP) as an SCD-hosted IoT gateway.
 - **Rationale:** Empirical testing showed that the OTBR introduces only 94 ms of routing latency (101 ms total median CoAP GET time), easily meeting the < 200 ms target. In failure testing (OTBR disconnected), in-mesh actuation between Node C and Node S maintained 100% functionality with zero downtime, proving that off-mesh dependency is isolated to remote access without threatening local field autonomy.
 - **Status:** [X] Accepted
-
 
 ## 4. ISO/IEC 30141 Mapping
 
@@ -134,7 +127,7 @@ Field technicians should expect an average control response time of 2.5 seconds 
 | Router | Packet Forwarder | Always-On (100% RX, ~30mA) | Cannot run on batteries long-term; requires main power or solar. | Lab 2 |
 | REED | Standby Forwarder | Always-On (100% RX, ~30mA) | Operates as leaf until promoted; continuous RX drains battery quickly. | Lab 2 |
 | End Device (FED) | Leaf Node | Always-On (100% RX, ~30mA) | Keeps radio receiver active; cannot meet 3-month battery life. | Lab 2 |
-| Sleepy End Device (SED)| Leaf Sensor Node | Duty-Cycled (~1% RX, 5µA sleep) | **Only role that meets 3-month target** by sleeping between polls. | Lab 2 |
+| Sleepy End Device (SED)| Leaf Sensor Node | Duty-Cycled (~1% RX, 5µA sleep) | Only role that meets 3-month target by sleeping between polls. | Lab 2 |
 | Border Router (OTBR) | Gateway / Leader | Always-On (Mains-Powered) | Bridges Wi-Fi and Thread; requires external power supply. | Lab 5 |
 
 ### Application & Service Domain (ASD) — API Contracts
@@ -142,23 +135,23 @@ Field technicians should expect an average control response time of 2.5 seconds 
 #### `/env/temp` — Air Temperature Interface
 | Parameter | Contract Specification |
 |---|---|
-| **Methods** | `GET`, `GET` + Observe (RFC 7641) |
-| **Content-Format** | `60` (`application/cbor`) |
-| **Payload** | `{"t": float16}`, °C, 6 bytes (`A1 61 74 F9 hh ll`) |
-| **Accuracy** | $\pm 2.0^\circ\text{C}$ (DHT11 datasheet rating) |
-| **Max-Age** | $60\text{ s} - \text{reading age}$ (counts down to 0) |
-| **Plausibility** | Rejects $T < -40^\circ\text{C}$, $T \ge 85^\circ\text{C}$, or $\Delta T > 5.0^\circ\text{C}$ in $2\text{ s}$ |
-| **Error Response** | `5.03 Service Unavailable` with `Max-Age: 10` when reading age $> 60\text{ s}$ |
-| **Observe Policy** | `NON` push when $\Delta T > 0.5^\circ\text{C}$; `CON` heartbeat after 45 s without change; single `5.03` terminates observation on expiration |
+| Methods | `GET`, `GET` + Observe (RFC 7641) |
+| Content-Format | `60` (`application/cbor`) |
+| Payload | `{"t": float16}`, °C, 6 bytes (`A1 61 74 F9 hh ll`) |
+| Accuracy | $\pm 2.0^\circ\text{C}$ (DHT11 datasheet rating) |
+| Max-Age | $60\text{ s} - \text{reading age}$ (counts down to 0) |
+| Plausibility | Rejects $T < -40^\circ\text{C}$, $T \ge 85^\circ\text{C}$, or $\Delta T > 5.0^\circ\text{C}$ in $2\text{ s}$ |
+| Error Response | `5.03 Service Unavailable` with `Max-Age: 10` when reading age $> 60\text{ s}$ |
+| Observe Policy | `NON` push when $\Delta T > 0.5^\circ\text{C}$; `CON` heartbeat after 45 s without change; single `5.03` terminates observation on expiration |
 
 #### `/act/valve` — Irrigation Valve Interface
 | Parameter | Contract Specification |
 |---|---|
-| **Methods** | `PUT` (set state), `GET` (read state) |
-| **Request Payload** | CBOR `{"v": 0 \| 1}` (Content-Format 60) or text `"0"` / `"1"` |
-| **Response Payload**| CBOR `{"v": 0 \| 1}` (Content-Format 60) |
-| **Response Codes** | `2.04 Changed` (PUT success), `2.05 Content` (GET), `4.00 Bad Request` |
-| **Idempotency** | Yes: duplicate `PUT` requests preserve the same state |
+| Methods | `PUT` (set state), `GET` (read state) |
+| Request Payload | CBOR `{"v": 0 \| 1}` (Content-Format 60) or text `"0"` / `"1"` |
+| Response Payload| CBOR `{"v": 0 \| 1}` (Content-Format 60) |
+| Response Codes | `2.04 Changed` (PUT success), `2.05 Content` (GET), `4.00 Bad Request` |
+| Idempotency | Yes: duplicate `PUT` requests preserve the same state |
 
 ```cddl
 env-reading = { t: float16 }        ; °C
@@ -170,21 +163,21 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 
 | Function | Provided by OTBR? | Empirical Evidence / Rationale |
 |---|---|---|
-| **Protocol conversion** | **Yes** | Converts 802.15.4 / 6LoWPAN mesh datagrams to Wi-Fi 802.11 IPv6/IPv4 packets. |
-| **Address mapping** | **Yes** | Performs NAT64 translation (`fd02:8e98:55d3:2:0:0::/96` mapping to IPv4). |
-| **Data processing** | **No** | Forwards CoAP/UDP packets transparently without altering application payloads. |
-| **Information fusion** | **No** | Does not aggregate or fuse multiple sensor measurements into combined records. |
-| **Certification** | **No** | Unauthenticated shell access over USB and open CoAP endpoints ($\rightarrow$ Lab 6). |
-| **Equipment management** | **Yes** | Advertises OMR prefixes via Router Advertisements, manages Thread Network Data, and acts as Leader. |
+| Protocol conversion | Yes | Converts 802.15.4 / 6LoWPAN mesh datagrams to Wi-Fi 802.11 IPv6/IPv4 packets. |
+| Address mapping | Yes | Performs NAT64 translation (`fd02:8e98:55d3:2:0:0::/96` mapping to IPv4). |
+| Data processing | No | Forwards CoAP/UDP packets transparently without altering application payloads. |
+| Information fusion | No | Does not aggregate or fuse multiple sensor measurements into combined records. |
+| Certification | No | Unauthenticated shell access over USB and open CoAP endpoints ($\rightarrow$ Lab 6). |
+| Equipment management | Yes | Advertises OMR prefixes via Router Advertisements, manages Thread Network Data, and acts as Leader. |
 
 ### ISO/IEC 30141 §A.5 — Enterprise Networking Pattern (Table A.4 Four-Network Walk)
 
 | Network | System Component in SoilSense | Concrete IP Address / Range Assigned |
 |---|---|---|
-| **Proximity** | Thread Mesh Network (Node S, Node C, OTBR Radio) | ML-EID `fdab:6a0d:311a:e59c::/64` & OMR `fd02:8e98:55d3:1::/64` |
-| **Access** | OTBR Wi-Fi Interface & Mobile Hotspot ("Juan") | OTBR IPv4 `10.101.156.84` & Link-Local `fe80::4a27:e2ff:fe2d:9a3c` |
-| **Services** | Flask CoAP Dashboard & Upstream IPv4 Targets | Laptop Dashboard `10.101.156.xx:5000` & NAT64 IPv4 Target `8.8.8.8` |
-| **User** | Daniela's Mobile Phone Browser | IP assigned dynamically by hotspot DHCP |
+| Proximity | Thread Mesh Network (Node S, Node C, OTBR Radio) | ML-EID `fdab:6a0d:311a:e59c::/64` & OMR `fd02:8e98:55d3:1::/64` |
+| Access | OTBR Wi-Fi Interface & Mobile Hotspot ("Juan") | OTBR IPv4 `10.101.156.84` & Link-Local `fe80::4a27:e2ff:fe2d:9a3c` |
+| Services | Flask CoAP Dashboard & Upstream IPv4 Targets | Laptop Dashboard `10.101.156.xx:5000` & NAT64 IPv4 Target `8.8.8.8` |
+| User | Daniela's Mobile Phone Browser | IP assigned dynamically by hotspot DHCP |
 
 ## 5. First Principles Reflections
 
@@ -263,7 +256,7 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Lab 5: OTBR added latency | < 100 ms | 94 ms ((Laptop → S) - (Laptop → OTBR)) | [X] Pass |
 | Lab 5: NAT64 RTT | < 200 ms | Synthesized `fd02:8e98:55d3:2:0:0:808:808` via /96 | [X] Pass |
 | Lab 6: DTLS Time | < 3s | ___ s | [ ] Pass |
----
+
 
 ## 7. Ethics & Sustainability Checklist
 
@@ -277,8 +270,6 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 *   [ ] **Lab 6:** Encryption enabled (Privacy).
 *   [ ] **Lab 8:** End-of-Life plan considered.
 
----
-
 ## 8. Viewpoint Analysis
 
 | Viewpoint | Labs Addressed | Key Concerns Documented |
@@ -290,23 +281,39 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Trustworthiness | Lab 4 | Data freshness (Max-Age), sensor failure signatures, radio load impact, and self-healing limits. |
 | Construction | Lab 5 | Dual-chip OTBR architecture (ESP32-S3 host + ESP32-C6 RCP) and ISO/IEC 30141 Annex A Enterprise System (A.3) and Networking (A.4) patterns. |
 
----
-
 ## 9. Trustworthiness Audit (Lab 6+)
 
 | Characteristic | Addressed? | How | Gaps |
 |----------------|------------|-----|------|
-| **Availability** | Yes (Lab 4) | Max-Age freshness tracking; explicit `5.03 Service Unavailable` on stale data (> 60 s); `ResponseTimeout` (42.4 s) when node is unreachable. | Server RAM reboot or 5.03 error clears observer subscriptions, requiring client re-registration. |
-| **Confidentiality** | No | → Lab 6 | Unencrypted UDP payloads accessible to eavesdroppers on the radio medium. |
-| **Integrity** | Yes (Lab 4) | Local range (-40 to 85 °C) and step-check (5 °C max jump) filters catch hardware/sensor fault spikes. | Cannot reject plausible false readings (e.g., injected 25.5 °C vs 21.0 °C) without multi-sensor fusion or authentication (→ Lab 6). |
-| **Reliability** | Yes (Lab 4) | Sensor reads sampled every 2 s with 0.0% failure rate under quiet radio conditions. | 19.4% failure rate under busy radio traffic (ping flood) exceeds < 5% target due to CPU single-wire timing interrupts. |
-| **Resilience** | Yes (Lab 4) | Auto-heals from transient read errors and wire reconnection (`Sensor back`). | Does not auto-heal active CoAP observations after 5.03 or node reboot; sensor driver missing at boot requires manual reset. |
+| Availability | Yes (Lab 4) | Max-Age freshness tracking; explicit `5.03 Service Unavailable` on stale data (> 60 s); `ResponseTimeout` (42.4 s) when node is unreachable. | Server RAM reboot or 5.03 error clears observer subscriptions, requiring client re-registration. |
+| Confidentiality | No | → Lab 6 | Unencrypted UDP payloads accessible to eavesdroppers on the radio medium. |
+| Integrity | Yes (Lab 4) | Local range (-40 to 85 °C) and step-check (5 °C max jump) filters catch hardware/sensor fault spikes. | Cannot reject plausible false readings (e.g., injected 25.5 °C vs 21.0 °C) without multi-sensor fusion or authentication (→ Lab 6). |
+| Reliability | Yes (Lab 4) | Sensor reads sampled every 2 s with 0.0% failure rate under quiet radio conditions. | 19.4% failure rate under busy radio traffic (ping flood) exceeds < 5% target due to CPU single-wire timing interrupts. |
+| Resilience | Yes (Lab 4) | Auto-heals from transient read errors and wire reconnection (`Sensor back`). | Does not auto-heal active CoAP observations after 5.03 or node reboot; sensor driver missing at boot requires manual reset. |
 | Safety |                  |     |      |
 | Compliance |              |     |      |
 
----
-
 ## 10. Construction Viewpoint - IoT System Pattern (Lab 8)
+
+| Pattern Element | Category | Your System |
+|-----------------|----------|-------------|
+| IoT System |            |             |
+| IoT Components |         |             |
+| Digital Network |        |             |
+| IoT Devices |            |             |
+| Primary Capability (observation) | |   |
+| Primary Capability (control) | |       |
+| Secondary Capability (processing) | |  |
+| Secondary Capability (transferring) | | |
+| Secondary Capability (storage) | |     |
+| Interface (network) |    |             |
+| Interface (human UI) |   |             |
+| Interface (application) | |            |
+| Supplemental (security) | |            |
+| Supplemental (orchestration) | |       |
+| Supplemental (management) | |          |
+
+## 11. Empirical Measurement Tables
 
 ### Lab 1: Range and Performance Baseline Data
 
@@ -324,16 +331,16 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 
 | Path | Hops | RTT Min (ms) | RTT Avg (ms) | RTT Max (ms) | Packet Loss (%) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **A → B** | 1 | 15.00 | **15.85** | 31.00 | 0.0% |
-| **A → C (via B)** | 2 | 30.00 | **30.55** | 37.00 | 0.0% |
+| A → B | 1 | 15.00 | 15.85 | 31.00 | 0.0% |
+| A → C (via B) | 2 | 30.00 | 30.55 | 37.00 | 0.0% |
 
 #### Tractor Test Convergence Baseline 
 
 | Run | Lost Pings | Healing Time (s) | Packet Loss (%) | Post-Healing Route |
 | :---: | :---: | :---: | :---: | :--- |
-| **1** | 9 | **9.0** | 4.5% | Direct A → C (LQI 1, Next Hop 63) |
-| **2** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
-| **3** | 8 | **8.0** | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
+| 1 | 9 | 9.0 | 4.5% | Direct A → C (LQI 1, Next Hop 63) |
+| 2 | 8 | 8.0 | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
+| 3 | 8 | 8.0 | 4.0% | Direct A → C (LQI 1, Next Hop 63) |
 
 ### Lab 3: CoAP Application Layer & Energy Baselines
 
@@ -355,6 +362,7 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
   $$\text{Battery Life (hours)} = \frac{2500\text{ mAh}}{0.1829\text{ mA}} \approx 13,668.6\text{ hours} \approx \mathbf{1.56\text{ years}}$$
 
 #### Empirical Byte Budget Comparison
+
 | Exchange | Request Payload | Response Payload | Total Packets | Notes |
 |---|---|---|---|---|
 | HTTP/JSON reading (Lab 0) | ~150 B + TCP | ~120 B + TCP | 7+ | Handshake, GET, 200 OK, teardown |
@@ -368,35 +376,29 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 #### DHT11 Sensor Characterization
 | Metric | Datasheet Rating | Measured Value |
 |---|---|---|
-| **Resolution** | 1.0 °C | 1.0 °C |
-| **Noise Spread (1 min static)** | N/A | 0.0 °C |
-| **Accuracy** | ±2.0 °C | ±2.0 °C |
-| **Read Execution Latency** | N/A | 21,811 µs avg (18,115 µs min / 22,113 µs max) |
+| Resolution | 1.0 °C | 1.0 °C |
+| Noise Spread (1 min static) | N/A | 0.0 °C |
+| Accuracy | ±2.0 °C | ±2.0 °C |
+| Read Execution Latency | N/A | 21,811 µs avg (18,115 µs min / 22,113 µs max) |
 
 #### Failure Mode & Radio Impact Baseline
+
 | Test Condition | Measured Value | Failure Signature |
 |---|---|---|
-| **Sensor Unplugged Detection** | 60.0 s | Explicit `5.03 Service Unavailable` (`no fresh reading`) |
-| **Node Off Network Detection** | 42.40 s | `coap receive response error 28: ResponseTimeout` |
-| **Quiet Radio Failure Rate (2 min)** | 0.0% (0 / 76 failed) | Clean timing slots] |
-| **Busy Radio Failure Rate (10 pings/s, 2 min)** | 19.4% (13 / 67 failed) | CPU interrupt bit-timing corruption (Checksum error) |
+| Sensor Unplugged Detection | 60.0 s | Explicit `5.03 Service Unavailable` (`no fresh reading`) |
+| Node Off Network Detection | 42.40 s | `coap receive response error 28: ResponseTimeout` |
+| Quiet Radio Failure Rate (2 min) | 0.0% (0 / 76 failed) | Clean timing slots] |
+| Busy Radio Failure Rate (10 pings/s, 2 min) | 19.4% (13 / 67 failed) | CPU interrupt bit-timing corruption (Checksum error) |
 
-| Pattern Element | Category | Your System |
-|-----------------|----------|-------------|
-| IoT System |            |             |
-| IoT Components |         |             |
-| Digital Network |        |             |
-| IoT Devices |            |             |
-| Primary Capability (observation) | |   |
-| Primary Capability (control) | |       |
-| Secondary Capability (processing) | |  |
-| Secondary Capability (transferring) | | |
-| Secondary Capability (storage) | |     |
-| Interface (network) |    |             |
-| Interface (human UI) |   |             |
-| Interface (application) | |            |
-| Supplemental (security) | |            |
-| Supplemental (orchestration) | |       |
-| Supplemental (management) | |          |
+### Lab 5: Border Router Boundary & Latency Metrics
 
----
+| Quantity | Prediction | Your value | Target |
+|---|---|---|---|
+| In-mesh RTT, C → S (`ot ping`) | 15 ms | 15.85 ms | your Lab 3 value |
+| Wi-Fi hop, laptop → OTBR, power save on | 200 ms | 267 ms | — |
+| Wi-Fi hop, laptop → OTBR, power save off | 20 ms | 15 ms | — |
+| Laptop → S, `ping` | 100 ms | 109 ms | — |
+| Laptop → S, CoAP GET `/env/temp` | 120 ms | 101 ms | < 200 ms |
+| OTBR added latency: (laptop → S) − (laptop → OTBR) | 80 ms | 94 ms | < 100 ms |
+| NAT64: S → 8.8.8.8 | 100 ms | Synthesized (`fd02:8e98:55d3:2:0:0:808:808`) | < 200 ms |
+| OTBR off: C → S `PUT /act/valve` | Works | Works (`2.04 Changed`) | works |
