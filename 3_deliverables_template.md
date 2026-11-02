@@ -45,7 +45,8 @@ Field technicians should expect an average control response time of 2.5 seconds 
   Field technicians tell a dead sensor from a dead node by checking the CoAP response code, as a dead sensor returns an explicit 5.03 Service Unavailable error after 60 seconds of freshness expiration. Conversely, a dead node causes complete radio silence, resulting in a 42.4-second CoAP ResponseTimeout error or missing 45-second Observe heartbeats. In short, if the node explicitly answers 5.03, inspect the sensor wiring, but if the node remains silent or times out, check node power and mesh connectivity.
 
 ### Lab 5: Border Router
-*   **To Daniela:**
+- **To Daniela (Customer):**
+  You can now monitor soil temperature and control the valve directly from your phone through the web dashboard with a response time of 101 ms over Wi-Fi. If the new Border Router box fails or loses power, off-mesh access from your phone will drop, but the field nodes will automatically keep working locally, allowing anyone in the field to operate the valve using a local mesh controller.
 
 ### Lab 6: Security
 *   **To Edward (Security):**
@@ -83,7 +84,13 @@ Field technicians should expect an average control response time of 2.5 seconds 
 - **Decision:** Set the Sleepy End Device (SED) polling interval (`pollperiod`) to 5000 ms (5 s).
 - **Rationale:** Empirical tests confirmed an average downlink ping RTT of 2,443.6 ms (max 4,444 ms), which is completely imperceptible for irrigation control. Polling every 5 seconds reduces the radio-on duty cycle to 0.2%, extending 2× AA battery lifespan to 1.56 years based on active RX ($74\text{ mA}$) and sleep ($35\text{ }\mu\text{A}$) current profiles.
 - **Status:** [X] Accepted
----
+
+**ADR-005: Selection of a Single OpenThread Border Router (OTBR) for Pilot Deployment**
+- **Context:** Connecting the isolated 802.15.4 Thread mesh to the farm's Wi-Fi network is required for remote mobile monitoring, but adding gateway hardware introduces cost, added latency, and potential single-point-of-failure risks.
+- **Decision:** Deploy a single dual-chip OTBR (ESP32-S3 host + ESP32-C6 RCP) as an SCD-hosted IoT gateway.
+- **Rationale:** Empirical testing showed that the OTBR introduces only 94 ms of routing latency (101 ms total median CoAP GET time), easily meeting the < 200 ms target. In failure testing (OTBR disconnected), in-mesh actuation between Node C and Node S maintained 100% functionality with zero downtime, proving that off-mesh dependency is isolated to remote access without threatening local field autonomy.
+- **Status:** [X] Accepted
+
 
 ## 4. ISO/IEC 30141 Mapping
 
@@ -200,11 +207,21 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 4. **Why can a busy radio make a sensor read fail?**  
    The DHT11 uses a single-wire protocol where the CPU manually measures microsecond timing pulses. Incoming radio interrupts pause the CPU during the reading window, distorting the measured pulse widths and causing checksum errors.
 
-
 **Lab 5:**
-...
+1. **Why does a prefix advertisement plus SLAAC make S reachable from outside, with no gateway "magic"?**  
+   The OTBR advertises the OMR prefix (`fd02:8e98:55d3:1::/64`) to the Thread mesh via Network Data, allowing Node S to configure a globally routable IPv6 address using SLAAC (RFC 4862). The OTBR then acts purely as a standard IPv6 router without requiring custom application-layer proxying or translation.
 
----
+2. **Why is NAT64 needed when Thread is IPv6?**  
+   Thread nodes operate on IPv6 only, but external Internet services and servers frequently use legacy IPv4 addresses. NAT64 synthesizes an IPv6 destination by prepending a `/96` prefix to the 32-bit IPv4 address, enabling IPv6-only mesh devices to communicate with IPv4 servers.
+
+3. **Why are the bytes of `/env/temp` the same on both sides of the OTBR?**  
+   Because the OTBR functions at the network layer (Layer 3 IPv6 routing) rather than the application layer. It forwards UDP packets transparently without altering or re-encoding the inner CoAP/CBOR payload.
+
+4. **Why should a mains-powered gateway turn Wi-Fi power save off, when a battery node would do the opposite?**  
+   Enabling Wi-Fi power save forces the radio receiver to sleep periodically, introducing high latency spikes (up to 267 ms). A mains-powered gateway prioritizes low latency (15 ms) over power conservation, whereas a battery-powered sensor node must prioritize battery lifespan.
+
+**Lab 6:**
+...
 
 ## 6. Performance Baselines
 
@@ -219,6 +236,8 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Lab 3: SED Latency (15s poll)| < 20s | 6,850.1 ms avg (min 479 ms / max 14,479 ms) | [X] Pass |
 | Lab 4: Lost Sensor Detection | ≤ 60 s | 60.0 s (5.03 response) | [X] Pass |
 | Lab 4: Busy Radio Failure Rate | < 5% | 19.4% (13/67 failed reads under ping flood) | [ ] Fail |
+| Lab 5: OTBR added latency | < 100 ms | 94 ms ((Laptop → S) - (Laptop → OTBR)) | [X] Pass |
+| Lab 5: NAT64 RTT | < 200 ms | Synthesized `fd02:8e98:55d3:2:0:0:808:808` via /96 | [X] Pass |
 | Lab 6: DTLS Time | < 3s | ___ s | [ ] Pass |
 ---
 
@@ -228,7 +247,9 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 * [X] **Lab 3 Safety & Sustainability Design (Failsafe Mechanism):** 
   To prevent crop damage, soil erosion, and water wastage if the network dies after receiving an `OPEN` (`v: 1`) command, the valve firmware implements a local hardware safety timer (15-minute cutoff). If no network heartbeat or explicit `CLOSE` (`v: 0`) command is received within 15 minutes, the valve autonomously shuts down (`v: 0`) on its own without requiring network connectivity.
 *   [X] **Lab 4 (Safety Design for Missing Data):** If an automated irrigation control rule receives a `5.03` error or no CoAP response for longer than 60 seconds, it must default to a safe state (`CLOSE` valve) after a 5-minute timeout to prevent crop flooding or water depletion.
-*   [ ] **Lab 5:** System works locally without cloud (Sustainability).
+*   [X] **Lab 5 (Local Autonomy & Sustainability):** Verified that if the OTBR dies or loses power, in-mesh CoAP control between field nodes (C → S) continues to operate locally without cloud or gateway dependency.
+*   [ ] **Lab 5 Security Gap (Unauthenticated Shell):** Anyone with physical access to the OTBR's USB cable can issue `ot` shell commands without authentication.
+*   [ ] **Lab 5 Privacy Gap (Open Wi-Fi Access):** Any device connected to the Wi-Fi hotspot can freely query sensor readings or trigger valve actuation without encryption or proof of identity ($\rightarrow$ Lab 6).
 *   [ ] **Lab 6:** Encryption enabled (Privacy).
 *   [ ] **Lab 8:** End-of-Life plan considered.
 
@@ -243,7 +264,7 @@ valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 | Usage |                  |                         |
 | Functional |             |                         |
 | Trustworthiness | Lab 4 | Data freshness (Max-Age), sensor failure signatures, radio load impact, and self-healing limits. |
-| Construction |           |                         |
+| Construction | Lab 5 | Dual-chip OTBR architecture (ESP32-S3 host + ESP32-C6 RCP) and ISO/IEC 30141 Annex A Enterprise System (A.3) and Networking (A.4) patterns. |
 
 ---
 
