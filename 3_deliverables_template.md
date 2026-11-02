@@ -101,6 +101,7 @@ Field technicians should expect an average control response time of 2.5 seconds 
 | ESP32-C6 SoC | SCD | Sensing/controlling device (§6.4–6.5) |
 | 802.15.4 radio + antenna | SCD | Communication subsystem |
 | Physical Sensor Module (DHT11) | SCD | Hardware transducer acquiring environmental readings |
+| ESP32-S3 + C6 RCP (OTBR) | SCD | SCD-hosted IoT gateway (§A.4 / Figure A.5) |
 | Air (RF medium) | PED | Physical entity — EM propagation |
 | Air / Soil Temperature & Humidity | PED | Physical entity being observed — Ambient thermal and moisture state |
 
@@ -113,6 +114,7 @@ Field technicians should expect an average control response time of 2.5 seconds 
 | Interface | Network & Serial | 802.15.4 network / OpenThread CLI / Serial monitor | Active | Lab 1 |
 | Supporting | Security & Time | Time sync / Hardware crypto accelerator | Latent | Lab 1 |
 | Latent | Wireless & Debug | BLE radio / WiFi radio / USB (debug interface) | Latent | Lab 1 |
+| Gateway | Protocol & Routing | OTBR dual-chip gateway (Wi-Fi ↔ Thread, NAT64) | Active | Lab 5 |
 
 ### Thread Address Classification
 
@@ -122,6 +124,7 @@ Field technicians should expect an average control response time of 2.5 seconds 
 | RLOC | `<prefix>:0:ff:fe00:<RLOC16>` | Entire mesh | Dynamic packet routing based on current network location. | Lab 2 |
 | ALOC | `<prefix>:0:ff:fe00:fcXX` | Entire mesh | Anycast role identification (`fc00` identifies the Leader). | Lab 2 |
 | ML-EID | `<prefix>:<random IID>` | Entire mesh | Stable application-layer device identification. | Lab 2 |
+| OMR | `fd02:8e98:55d3:1:<SLAAC IID>` | Entire mesh / Wi-Fi | Routable address advertised by OTBR for off-mesh reachability. | Lab 5 |
 
 ### Functional Viewpoint — Thread Roles & Power Profiles
 
@@ -132,6 +135,7 @@ Field technicians should expect an average control response time of 2.5 seconds 
 | REED | Standby Forwarder | Always-On (100% RX, ~30mA) | Operates as leaf until promoted; continuous RX drains battery quickly. | Lab 2 |
 | End Device (FED) | Leaf Node | Always-On (100% RX, ~30mA) | Keeps radio receiver active; cannot meet 3-month battery life. | Lab 2 |
 | Sleepy End Device (SED)| Leaf Sensor Node | Duty-Cycled (~1% RX, 5µA sleep) | **Only role that meets 3-month target** by sleeping between polls. | Lab 2 |
+| Border Router (OTBR) | Gateway / Leader | Always-On (Mains-Powered) | Bridges Wi-Fi and Thread; requires external power supply. | Lab 5 |
 
 ### Application & Service Domain (ASD) — API Contracts
 
@@ -160,7 +164,27 @@ Field technicians should expect an average control response time of 2.5 seconds 
 env-reading = { t: float16 }        ; °C
 valve-state = { v: 0 / 1 }          ; 0 = closed, 1 = open
 ```
----
+### ISO/IEC 30141 §A.4 — IoT Gateway Scorecard (Enterprise System Pattern, Table A.3)
+
+> *"IoT gateways are devices which connect SCD with other domains. IoT gateways provide functions such as protocol conversion, address mapping, data processing, information fusion, certification, and equipment management."*
+
+| Function | Provided by OTBR? | Empirical Evidence / Rationale |
+|---|---|---|
+| **Protocol conversion** | **Yes** | Converts 802.15.4 / 6LoWPAN mesh datagrams to Wi-Fi 802.11 IPv6/IPv4 packets. |
+| **Address mapping** | **Yes** | Performs NAT64 translation (`fd02:8e98:55d3:2:0:0::/96` mapping to IPv4). |
+| **Data processing** | **No** | Forwards CoAP/UDP packets transparently without altering application payloads. |
+| **Information fusion** | **No** | Does not aggregate or fuse multiple sensor measurements into combined records. |
+| **Certification** | **No** | Unauthenticated shell access over USB and open CoAP endpoints ($\rightarrow$ Lab 6). |
+| **Equipment management** | **Yes** | Advertises OMR prefixes via Router Advertisements, manages Thread Network Data, and acts as Leader. |
+
+### ISO/IEC 30141 §A.5 — Enterprise Networking Pattern (Table A.4 Four-Network Walk)
+
+| Network | System Component in SoilSense | Concrete IP Address / Range Assigned |
+|---|---|---|
+| **Proximity** | Thread Mesh Network (Node S, Node C, OTBR Radio) | ML-EID `fdab:6a0d:311a:e59c::/64` & OMR `fd02:8e98:55d3:1::/64` |
+| **Access** | OTBR Wi-Fi Interface & Mobile Hotspot ("Juan") | OTBR IPv4 `10.101.156.84` & Link-Local `fe80::4a27:e2ff:fe2d:9a3c` |
+| **Services** | Flask CoAP Dashboard & Upstream IPv4 Targets | Laptop Dashboard `10.101.156.xx:5000` & NAT64 IPv4 Target `8.8.8.8` |
+| **User** | Daniela's Mobile Phone Browser | IP assigned dynamically by hotspot DHCP |
 
 ## 5. First Principles Reflections
 
